@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DT-5G | Autonomous Digital Twin — Neural Operations Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ============================================================
+   ROOT & RESET
+============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#03060d;
+  --bg1:#060c18;
+  --bg2:#0a1428;
+  --bg3:#0e1a30;
+  --border:#ffffff0d;
+  --border2:#ffffff18;
+  --text:#c8dff0;
+  --muted:#3d5a6e;
+  --dim:#1a2d42;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Rajdhani',sans-serif;
+  --cyan:#00e5ff;
+  --cyan2:#00b4cc;
+  --green:#00ff88;
+  --amber:#ffaa00;
+  --red:#ff2244;
+  --purple:#b040ff;
+  --blue:#2979ff;
+  --glow-c:rgba(0,229,255,0.12);
+  --glow-r:rgba(255,34,68,0.15);
+  --glow-g:rgba(0,255,136,0.10);
+}
+html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--mono);font-size:12px;overflow:hidden;cursor:default}
+
+/* ============================================================
+   SCANLINE + NOISE OVERLAY
+============================================================ */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+}
+
+/* ============================================================
+   LAYOUT
+============================================================ */
+.shell{display:grid;grid-template-columns:200px 1fr;grid-template-rows:48px 1fr;height:100vh;width:100vw;overflow:hidden}
+.topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--bg1);border-bottom:1px solid var(--border);position:relative;z-index:10}
+.sidebar{grid-row:2;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.main{grid-row:2;overflow-y:auto;overflow-x:hidden;padding:16px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+
+/* ============================================================
+   TOPBAR
+============================================================ */
+.tb-logo{font-family:var(--display);font-size:20px;font-weight:700;letter-spacing:0.1em;color:#fff}
+.tb-logo span{color:var(--cyan)}
+.tb-center{display:flex;align-items:center;gap:20px}
+.tb-metric{text-align:center}
+.tb-metric-val{font-size:14px;font-weight:700;color:var(--cyan);font-family:var(--display)}
+.tb-metric-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em}
+.tb-divider{width:1px;height:24px;background:var(--border2)}
+.tb-right{display:flex;align-items:center;gap:12px}
+.time-display{font-size:13px;font-weight:500;color:var(--text);font-family:var(--mono)}
+.global-status{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:0.1em;font-family:var(--display);border:1px solid;transition:all .3s}
+.global-status.nominal{color:var(--green);border-color:rgba(0,255,136,0.3);background:rgba(0,255,136,0.05)}
+.global-status.warning{color:var(--amber);border-color:rgba(255,170,0,0.3);background:rgba(255,170,0,0.05)}
+.global-status.critical{color:var(--red);border-color:rgba(255,34,68,0.4);background:rgba(255,34,68,0.08);animation:status-pulse 1s ease-in-out infinite}
+@keyframes status-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,34,68,0)}50%{box-shadow:0 0 12px 2px rgba(255,34,68,0.2)}}
+.status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:dot-pulse 2s ease-in-out infinite}
+@keyframes dot-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ============================================================
+   SIDEBAR
+============================================================ */
+.sb-section{padding:12px 0 4px;border-bottom:1px solid var(--border)}
+.sb-section-label{padding:0 16px 6px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.12em}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--muted);font-size:11px;font-weight:500;transition:all .2s;border-left:2px solid transparent;user-select:none;letter-spacing:0.03em}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.02)}
+.nav-item.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(0,229,255,0.05)}
+.nav-icon{width:16px;text-align:center;font-size:13px}
+
+.sb-node-list{padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.sb-node{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:4px;background:var(--bg2);border:1px solid var(--border)}
+.sb-node-name{font-size:10px;font-weight:700;color:var(--text);letter-spacing:0.05em}
+.sb-node-val{font-size:10px;color:var(--muted)}
+.sb-node .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dot.green{background:var(--green);box-shadow:0 0 4px var(--green)}
+.dot.amber{background:var(--amber);box-shadow:0 0 4px var(--amber)}
+.dot.red{background:var(--red);box-shadow:0 0 6px var(--red);animation:dot-pulse 0.8s ease-in-out infinite}
+.dot.gray{background:var(--muted)}
+
+.sb-bottom{margin-top:auto;padding:12px;border-top:1px solid var(--border)}
+.sb-stat-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0}
+.sb-stat-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em}
+.sb-stat-val{font-size:11px;font-weight:700;color:var(--cyan)}
+
+/* ============================================================
+   PAGES
+============================================================ */
+.page{display:none;flex-direction:column;gap:14px;animation:page-in .25s ease}
+.page.active{display:flex}
+@keyframes page-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   CARDS / PANELS
+============================================================ */
+.card{background:var(--bg1);border:1px solid var(--border);border-radius:6px;overflow:hidden;position:relative}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--border)}
+.card-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-family:var(--display)}
+.card-body{padding:14px 16px}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:2px;font-size:9px;font-weight:700;letter-spacing:0.08em;font-family:var(--display);border:1px solid}
+.badge.cyan{color:var(--cyan);border-color:rgba(0,229,255,0.25);background:rgba(0,229,255,0.07)}
+.badge.green{color:var(--green);border-color:rgba(0,255,136,0.25);background:rgba(0,255,136,0.07)}
+.badge.amber{color:var(--amber);border-color:rgba(255,170,0,0.25);background:rgba(255,170,0,0.07)}
+.badge.red{color:var(--red);border-color:rgba(255,34,68,0.3);background:rgba(255,34,68,0.08)}
+.badge.purple{color:var(--purple);border-color:rgba(176,64,255,0.3);background:rgba(176,64,255,0.08)}
+
+/* ============================================================
+   KPI ROW
+============================================================ */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:12px 14px;position:relative;overflow:hidden;transition:border-color .3s}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:currentColor;opacity:0.3;transition:opacity .3s}
+.kpi.green{color:var(--green)}
+.kpi.amber{color:var(--amber)}
+.kpi.red{color:var(--red);animation:kpi-alert .8s ease-in-out infinite}
+.kpi.cyan{color:var(--cyan)}
+@keyframes kpi-alert{0%,100%{border-color:rgba(255,34,68,0.2)}50%{border-color:rgba(255,34,68,0.6)}}
+.kpi-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px}
+.kpi-val{font-size:26px;font-weight:700;font-family:var(--display);line-height:1;color:inherit}
+.kpi-unit{font-size:12px;font-weight:400;margin-left:1px;opacity:0.7}
+.kpi-sub{font-size:9px;margin-top:5px;opacity:0.7}
+.kpi-spark{display:flex;align-items:flex-end;gap:1.5px;height:18px;margin-top:8px}
+.kpi-spark .b{width:3px;border-radius:1px;min-height:2px}
+
+/* ============================================================
+   TOPOLOGY MAP
+============================================================ */
+#topology-svg{width:100%;height:280px}
+.topo-node{cursor:pointer;transition:all .3s}
+.topo-node:hover .node-ring{filter:brightness(1.4)}
+.node-ring{transition:all .3s}
+.topo-link{transition:stroke .3s,stroke-width .3s}
+.topo-link.active{animation:link-flow 1.5s linear infinite}
+.topo-link.attack{stroke:var(--red)!important;stroke-width:2!important;animation:link-attack 0.5s ease-in-out infinite}
+@keyframes link-flow{0%{stroke-dashoffset:20}100%{stroke-dashoffset:0}}
+@keyframes link-attack{0%,100%{opacity:1}50%{opacity:.3}}
+.packet-dot{r:3;fill:var(--cyan);animation:packet-move 2s linear infinite}
+
+/* ============================================================
+   HEATMAP
+============================================================ */
+.heatmap-grid{display:grid;grid-template-columns:80px repeat(12,1fr);gap:2px;font-size:9px}
+.hm-label{display:flex;align-items:center;color:var(--muted);font-size:9px;font-weight:700;padding-right:6px;justify-content:flex-end}
+.hm-cell{height:28px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;cursor:pointer;transition:all .2s;border:1px solid transparent;font-family:var(--display)}
+.hm-cell:hover{filter:brightness(1.3);border-color:rgba(255,255,255,0.3);transform:scale(1.05);z-index:10;position:relative}
+.hm-header{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:9px}
+
+/* ============================================================
+   AI EXPLANATION PANEL
+============================================================ */
+.ai-panel{background:linear-gradient(135deg,rgba(0,229,255,0.03) 0%,rgba(176,64,255,0.03) 100%);border:1px solid rgba(0,229,255,0.12);border-radius:6px;padding:0;overflow:hidden}
+.ai-header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(0,229,255,0.08)}
+.ai-icon{width:28px;height:28px;border-radius:50%;background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.2);display:flex;align-items:center;justify-content:center;font-size:13px}
+.ai-title{font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:0.05em;font-family:var(--display)}
+.ai-sub{font-size:9px;color:var(--muted);margin-top:1px}
+.ai-body{padding:14px 16px;min-height:80px}
+.ai-text{font-size:11px;color:var(--text);line-height:1.8;font-family:var(--mono)}
+.ai-text .highlight{color:var(--cyan);font-weight:700}
+.ai-text .danger{color:var(--red);font-weight:700}
+.ai-text .ok{color:var(--green);font-weight:700}
+.ai-cursor{display:inline-block;width:7px;height:13px;background:var(--cyan);animation:blink .7s step-end infinite;vertical-align:text-bottom;margin-left:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.ai-typing{color:var(--muted);font-style:italic}
+
+.confidence-bar-wrap{display:flex;align-items:center;gap:10px;margin-top:10px}
+.conf-label{font-size:9px;color:var(--muted);width:80px;text-transform:uppercase;letter-spacing:0.06em}
+.conf-bar-outer{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+.conf-bar-inner{height:100%;border-radius:2px;transition:width 1s ease}
+.conf-val{font-size:10px;font-weight:700;width:36px;text-align:right}
+
+/* ============================================================
+   ATTACK SIMULATOR
+============================================================ */
+.attack-panel{border:1px solid rgba(255,34,68,0.15);border-radius:6px;overflow:hidden;background:var(--bg1)}
+.attack-header{padding:12px 16px;background:rgba(255,34,68,0.05);border-bottom:1px solid rgba(255,34,68,0.12);display:flex;align-items:center;justify-content:space-between}
+.attack-title{font-family:var(--display);font-size:13px;font-weight:700;color:var(--red);letter-spacing:0.08em}
+.attack-warning{font-size:9px;color:rgba(255,34,68,0.6);font-family:var(--display);letter-spacing:0.06em}
+.attack-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 16px}
+.attack-btn{padding:10px 12px;border-radius:4px;border:1px solid rgba(255,34,68,0.2);background:rgba(255,34,68,0.04);color:var(--red);cursor:pointer;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.06em;transition:all .2s;text-align:left}
+.attack-btn:hover{background:rgba(255,34,68,0.12);border-color:rgba(255,34,68,0.5);box-shadow:0 0 12px rgba(255,34,68,0.15)}
+.attack-btn.active{background:rgba(255,34,68,0.18);border-color:var(--red);box-shadow:0 0 16px rgba(255,34,68,0.2);animation:btn-attack .5s ease-in-out infinite alternate}
+@keyframes btn-attack{from{box-shadow:0 0 8px rgba(255,34,68,0.2)}to{box-shadow:0 0 20px rgba(255,34,68,0.4)}}
+.attack-btn-sub{font-size:9px;color:rgba(255,34,68,0.5);font-weight:400;margin-top:3px;font-family:var(--mono);text-transform:none;letter-spacing:0}
+.attack-btn .ab-icon{font-size:16px;display:block;margin-bottom:4px}
+.attack-log{padding:0 16px 14px;max-height:180px;overflow-y:auto}
+.atk-entry{padding:6px 0;border-bottom:1px solid var(--border);font-size:10px;display:flex;gap:10px}
+.atk-entry:last-child{border-bottom:none}
+.atk-time{color:var(--muted);flex-shrink:0;width:48px}
+.atk-msg{flex:1;line-height:1.5}
+.atk-msg.attack{color:var(--red)}
+.atk-msg.heal{color:var(--green)}
+.atk-msg.info{color:var(--cyan)}
+.heal-btn{margin:4px 16px 14px;padding:8px 16px;border-radius:4px;border:1px solid rgba(0,255,136,0.25);background:rgba(0,255,136,0.05);color:var(--green);cursor:pointer;font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:0.08em;transition:all .2s;width:calc(100% - 32px)}
+.heal-btn:hover{background:rgba(0,255,136,0.12);box-shadow:0 0 14px rgba(0,255,136,0.15)}
+.heal-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ============================================================
+   CHARTS
+============================================================ */
+.chart-canvas-wrap{position:relative;height:120px}
+
+/* ============================================================
+   ACTIONS LOG
+============================================================ */
+.log-entry{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:10px}
+.log-entry:last-child{border-bottom:none}
+.log-time{color:var(--muted);flex-shrink:0;width:52px;font-family:var(--mono)}
+.log-node{color:var(--cyan);font-weight:700;flex-shrink:0;width:52px;font-family:var(--mono)}
+.log-action{flex:1;color:var(--text);line-height:1.5}
+.log-badge{flex-shrink:0}
+.log-outcome{font-size:9px;color:var(--green);margin-top:1px}
+
+/* ============================================================
+   SCROLLBAR
+============================================================ */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+
+/* ============================================================
+   MISC
+============================================================ */
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.row-4030{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+.row-3070{display:grid;grid-template-columns:1fr 1.8fr;gap:14px}
+
+.node-bar-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+.node-bar-row:last-child{border-bottom:none}
+.nbr-name{font-size:10px;font-weight:700;width:52px;flex-shrink:0;color:var(--text);font-family:var(--display);letter-spacing:0.05em}
+.nbr-track{flex:1;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden}
+.nbr-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(0.4,0,0.2,1)}
+.nbr-val{font-size:10px;color:var(--muted);width:38px;text-align:right;font-family:var(--mono)}
+.nbr-badge{font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;font-family:var(--display);letter-spacing:0.06em;flex-shrink:0;width:34px;text-align:center}
+.nbr-badge.ok{background:rgba(0,255,136,0.08);color:var(--green)}
+.nbr-badge.warn{background:rgba(255,170,0,0.08);color:var(--amber)}
+.nbr-badge.crit{background:rgba(255,34,68,0.1);color:var(--red)}
+
+.sla-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+.sla-row:last-child{border-bottom:none}
+.sla-label{font-size:10px;color:var(--muted)}
+.sla-right{display:flex;align-items:center;gap:10px}
+.sla-track{width:90px;height:3px;background:rgba(255,255,255,0.05);border-radius:1px;overflow:hidden}
+.sla-fill{height:100%;border-radius:1px;transition:width .8s ease}
+.sla-val{font-size:10px;font-weight:700;width:40px;text-align:right;font-family:var(--mono)}
+
+.twin-stat{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
+.ts-val{font-size:24px;font-weight:700;font-family:var(--display);margin-bottom:2px}
+.ts-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em}
+
+.no-data{color:var(--muted);font-size:10px;padding:16px 0;text-align:center;font-style:italic}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ===== TOPBAR ===== -->
+  <div class="topbar">
+    <div class="tb-logo">DT<span>-5G</span>&nbsp;&nbsp;<span style="font-size:10px;color:var(--muted);font-family:var(--mono);font-weight:400;letter-spacing:0.05em">DIGITAL TWIN OPS CENTER</span></div>
+    <div class="tb-center">
+      <div class="tb-metric"><div class="tb-metric-val" id="tb-cpu">—</div><div class="tb-metric-label">CPU AVG</div></div>
+      <div class="tb-divider"></div>
+      <div class="tb-metric"><div class="tb-metric-val" id="tb-lat">—</div><div class="tb-metric-label">LATENCY</div></div>
+      <div class="tb-divider"></div>
+      <div class="tb-metric"><div class="tb-metric-val" id="tb-tp">—</div><div class="tb-metric-label">THROUGHPUT</div></div>
+      <div class="tb-divider"></div>
+      <div class="tb-metric"><div class="tb-metric-val" id="tb-pl">—</div><div class="tb-metric-label">PKT LOSS</div></div>
+      <div class="tb-divider"></div>
+      <div class="tb-metric"><div class="tb-metric-val" id="tb-faults">0</div><div class="tb-metric-label">FAULTS PREVENTED</div></div>
+    </div>
+    <div class="tb-right">
+      <div class="time-display" id="clock">00:00:00</div>
+      <div class="global-status nominal" id="global-status"><div class="status-dot"></div><span id="global-status-text">NOMINAL</span></div>
+    </div>
+  </div>
+
+  <!-- ===== SIDEBAR ===== -->
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-section-label">Navigation</div>
+      <div class="nav-item active" onclick="showPage('overview',this)"><span class="nav-icon">◈</span>Overview</div>
+      <div class="nav-item" onclick="showPage('heatmap',this)"><span class="nav-icon">▦</span>Anomaly Heatmap</div>
+      <div class="nav-item" onclick="showPage('attack',this)"><span class="nav-icon">⚡</span>Attack Simulator</div>
+      <div class="nav-item" onclick="showPage('analytics',this)"><span class="nav-icon">◎</span>Analytics</div>
+      <div class="nav-item" onclick="showPage('topology',this)"><span class="nav-icon">⬡</span>Network Topology</div>
+    </div>
+    <div class="sb-section" style="flex:1;overflow-y:auto">
+      <div class="sb-section-label">Live Nodes</div>
+      <div class="sb-node-list" id="sb-nodes"></div>
+    </div>
+    <div class="sb-bottom">
+      <div class="sb-stat-row"><span class="sb-stat-label">SYNC LAT</span><span class="sb-stat-val" id="sb-sync">—ms</span></div>
+      <div class="sb-stat-row"><span class="sb-stat-label">TWIN ACC</span><span class="sb-stat-val" id="sb-acc">—%</span></div>
+      <div class="sb-stat-row"><span class="sb-stat-label">UPTIME</span><span class="sb-stat-val" id="sb-uptime">00:00:00</span></div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+
+    <!-- ===================== OVERVIEW PAGE ===================== -->
+    <div id="page-overview" class="page active">
+
+      <!-- KPI Row -->
+      <div class="kpi-grid" id="kpi-row"></div>
+
+      <!-- Twin + AI row -->
+      <div class="row-3070">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <!-- Node CPU bars -->
+          <div class="card">
+            <div class="card-header"><div class="card-title">Per-Node CPU</div><span class="badge cyan">LIVE</span></div>
+            <div class="card-body" id="node-cpu-bars"></div>
+          </div>
+          <!-- Twin Health -->
+          <div class="card">
+            <div class="card-header"><div class="card-title">Digital Twin Health</div></div>
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="twin-health-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Explanation Panel -->
+        <div class="ai-panel" id="ai-panel">
+          <div class="ai-header">
+            <div class="ai-icon">🧠</div>
+            <div>
+              <div class="ai-title">NEURAL ANALYSIS ENGINE</div>
+              <div class="ai-sub" id="ai-sub">Monitoring all nodes — no anomalies detected</div>
+            </div>
+            <span class="badge cyan" id="ai-confidence-badge" style="margin-left:auto">READY</span>
+          </div>
+          <div class="ai-body">
+            <div class="ai-text" id="ai-explanation">System operating within normal parameters. Digital twin sync confirmed across all 5 nodes. No predictive fault signals detected in current telemetry window.<span class="ai-cursor"></span></div>
+            <div id="confidence-bars" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions + SLA -->
+      <div class="row2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Autonomous Actions Log</div><span class="badge purple" id="action-count-badge">0 TODAY</span></div>
+          <div class="card-body" id="actions-log" style="max-height:200px;overflow-y:auto"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">SLA Compliance</div><span class="badge green" id="sla-badge">MEETING TARGETS</span></div>
+          <div class="card-body" id="sla-panel"></div>
+        </div>
+      </div>
+    </div><!-- /overview -->
+
+    <!-- ===================== HEATMAP PAGE ===================== -->
+    <div id="page-heatmap" class="page">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Anomaly Heatmap — 12-Period Rolling Window</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:var(--muted)">METRIC</span>
+            <select id="hm-metric-select" onchange="renderHeatmap()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-size:10px;padding:3px 6px;border-radius:3px;font-family:var(--mono)">
+              <option value="cpu">CPU %</option>
+              <option value="latency">Latency ms</option>
+              <option value="packet_loss">Packet Loss %</option>
+              <option value="throughput">Throughput Mbps</option>
+            </select>
+            <span class="badge cyan">LIVE UPDATE</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="heatmap-container"></div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:12px">
+            <span style="font-size:9px;color:var(--muted)">LOW</span>
+            <div style="display:flex;gap:2px">
+              <div style="width:18px;height:10px;border-radius:2px;background:rgba(0,255,136,0.8)"></div>
+              <div style="width:18px;height:10px;border-radius:2px;background:rgba(100,200,100,0.6)"></div>
+              <div style="width:18px;height:10px;border-radius:2px;background:rgba(180,180,50,0.7)"></div>
+              <div style="width:18px;height:10px;border-radius:2px;background:rgba(255,170,0,0.8)"></div>
+              <div style="width:18px;height:10px;border-radius:2px;background:rgba(255,100,0,0.8)"></div>
+              <div style="width:18px;height:10px;border-radius:2px;background:rgba(255,34,68,0.9)"></div>
+            </div>
+            <span style="font-size:9px;color:var(--muted)">CRITICAL</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Heatmap AI explanation -->
+      <div class="ai-panel">
+        <div class="ai-header">
+          <div class="ai-icon">🔍</div>
+          <div><div class="ai-title">HEATMAP PATTERN ANALYSIS</div><div class="ai-sub">Click any cell for root cause analysis</div></div>
+        </div>
+        <div class="ai-body">
+          <div class="ai-text" id="heatmap-ai-text">Select a cell in the heatmap above to trigger root cause analysis. The AI engine will analyze the metric value, node history, and correlate with other system parameters to explain what caused the anomaly and recommend corrective action.<span class="ai-cursor"></span></div>
+        </div>
+      </div>
+    </div><!-- /heatmap -->
+
+    <!-- ===================== ATTACK SIMULATOR PAGE ===================== -->
+    <div id="page-attack" class="page">
+      <div class="attack-panel">
+        <div class="attack-header">
+          <div>
+            <div class="attack-title">⚠ CONTROLLED FAILURE SIMULATOR</div>
+            <div class="attack-warning">DEMONSTRATION MODE — Digital twin will detect and auto-heal each scenario</div>
+          </div>
+          <span class="badge red" id="attack-status-badge">STANDBY</span>
+        </div>
+        <div class="attack-grid">
+          <button class="attack-btn" id="atk-ddos" onclick="launchAttack('ddos')">
+            <span class="ab-icon">🌊</span>DDoS TRAFFIC FLOOD
+            <div class="attack-btn-sub">Injects 10x normal traffic → packet loss spike → auto-throttle response</div>
+          </button>
+          <button class="attack-btn" id="atk-cpu" onclick="launchAttack('cpu')">
+            <span class="ab-icon">🔥</span>CPU OVERLOAD INJECTION
+            <div class="attack-btn-sub">Forces CPU 95%+ → twin detects degradation → load redistribution triggered</div>
+          </button>
+          <button class="attack-btn" id="atk-latency" onclick="launchAttack('latency')">
+            <span class="ab-icon">⏱</span>LATENCY SPIKE
+            <div class="attack-btn-sub">Simulates congested link → latency 400ms → re-routing initiated</div>
+          </button>
+          <button class="attack-btn" id="atk-cascade" onclick="launchAttack('cascade')">
+            <span class="ab-icon">💀</span>CASCADE FAILURE
+            <div class="attack-btn-sub">Chain reaction: EDGE-1 fails → CORE overloads → AI isolates + reroutes</div>
+          </button>
+          <button class="attack-btn" id="atk-partition" onclick="launchAttack('partition')">
+            <span class="ab-icon">✂</span>NETWORK PARTITION
+            <div class="attack-btn-sub">CLOUD node isolated → twin predicts SLA breach → fallback path activated</div>
+          </button>
+          <button class="attack-btn" id="atk-memoryLeak" onclick="launchAttack('memoryleak')">
+            <span class="ab-icon">🧩</span>MEMORY LEAK SIM
+            <div class="attack-btn-sub">Gradual CPU drift → trend analysis catches pre-fault → preventive restart</div>
+          </button>
+        </div>
+        <div class="attack-log" id="attack-log">
+          <div class="atk-entry"><div class="atk-time">—</div><div class="atk-msg info">System ready. Launch a scenario to demonstrate self-healing capabilities.</div></div>
+        </div>
+        <button class="heal-btn" id="heal-btn" onclick="triggerHeal()" disabled>
+          ✦ AUTONOMOUS SELF-HEAL — Restore All Systems
+        </button>
+      </div>
+
+      <!-- Live response metrics during attack -->
+      <div class="row3" id="attack-kpis-row">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Response Timeline</div></div>
+          <div class="card-body" id="atk-timeline" style="max-height:200px;overflow-y:auto">
+            <div class="no-data">No active scenario</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Detection Performance</div></div>
+          <div class="card-body" id="atk-performance">
+            <div class="no-data">Awaiting attack scenario</div>
+          </div>
+        </div>
+        <div class="ai-panel" style="height:auto">
+          <div class="ai-header">
+            <div class="ai-icon">⚡</div>
+            <div><div class="ai-title">REAL-TIME RESPONSE AI</div><div class="ai-sub" id="atk-ai-sub">Monitoring for threats</div></div>
+          </div>
+          <div class="ai-body">
+            <div class="ai-text" id="atk-ai-text">Digital twin is in standby mode. Launch a failure scenario to observe the autonomous detection and self-healing response in real time.<span class="ai-cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /attack -->
+
+    <!-- ===================== ANALYTICS PAGE ===================== -->
+    <div id="page-analytics" class="page">
+      <div class="row2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">CPU Utilisation Trend</div><span class="badge amber">LIVE</span></div>
+          <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-cpu"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Network Latency</div><span class="badge cyan">LIVE</span></div>
+          <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-lat"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Throughput</div><span class="badge green">LIVE</span></div>
+          <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-tp"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Packet Loss</div><span class="badge red">LIVE</span></div>
+          <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-pl"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== TOPOLOGY PAGE ===================== -->
+    <div id="page-topology" class="page">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Live Network Topology — Digital Twin View</div><span class="badge cyan" id="topo-sync">TWIN SYNCED</span></div>
+        <div class="card-body" style="padding:8px">
+          <svg id="topology-svg" viewBox="0 0 700 280">
+            <defs>
+              <marker id="marrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M2 2L8 5L2 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </marker>
+              <filter id="glow-filter">
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+            <!-- Links will be drawn by JS -->
+            <g id="topo-links"></g>
+            <g id="topo-nodes"></g>
+            <g id="topo-packets"></g>
+          </svg>
+        </div>
+      </div>
+      <div class="ai-panel">
+        <div class="ai-header">
+          <div class="ai-icon">🗺</div>
+          <div><div class="ai-title">TOPOLOGY INTELLIGENCE</div><div class="ai-sub">Click any node for detailed diagnostics</div></div>
+        </div>
+        <div class="ai-body">
+          <div class="ai-text" id="topo-ai-text">Network topology is fully synced with the digital twin. All 5 nodes are operational. Packet routing is following nominal paths. Click any node to view detailed telemetry, fault history, and predicted failure windows.<span class="ai-cursor"></span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ============================================================
+// SIMULATION ENGINE — Generates realistic 5G telemetry
+// ============================================================
+const NODES = ['EDGE-1','EDGE-2','CORE','CLOUD','RAN-1'];
+const HISTORY_LEN = 60;
+
+const nodeState = {
+  'EDGE-1':  {cpu:35, lat:28, tp:850, pl:0.8, trend:0, status:'normal'},
+  'EDGE-2':  {cpu:48, lat:35, tp:720, pl:1.2, trend:0, status:'normal'},
+  'CORE':    {cpu:52, lat:18, tp:1800, pl:0.4, trend:0, status:'normal'},
+  'CLOUD':   {cpu:39, lat:42, tp:650, pl:0.9, trend:0, status:'normal'},
+  'RAN-1':   {cpu:29, lat:22, tp:920, pl:0.6, trend:0, status:'normal'},
+};
+
+const history = {
+  cpu:[], latency:[], throughput:[], packet_loss:[], ts:[],
+  perNode: Object.fromEntries(NODES.map(n=>([n,{cpu:[],lat:[],pl:[]}])))
+};
+
+const heatmapHistory = Object.fromEntries(NODES.map(n=>[n,{
+  cpu:[], latency:[], packet_loss:[], throughput:[]
+}]));
+
+let systemStats = {
+  actionsToday: 0, faultsPrevented: 0,
+  syncLatency: 12, stateAccuracy: 99.6,
+  uptimeStart: Date.now()
+};
+
+let actionsLog = [];
+let attackActive = false;
+let currentAttack = null;
+let attackTimer = null;
+let attackPhase = 0;
+
+// ============================================================
+// TELEMETRY SIMULATION
+// ============================================================
+function jitter(v, pct) {
+  return v * (1 + (Math.random()-0.5)*pct*2);
+}
+
+function clamp(v,mn,mx){return Math.max(mn,Math.min(mx,v));}
+
+function tick() {
+  let totalCpu=0, totalLat=0, totalTp=0, totalPl=0;
+
+  NODES.forEach(n=>{
+    const s = nodeState[n];
+    // Natural drift
+    s.cpu     = clamp(jitter(s.cpu + s.trend*0.5 + (Math.random()-0.49)*1.2, 0.03), 5, 100);
+    s.lat     = clamp(jitter(s.lat + (Math.random()-0.49)*2, 0.04), 5, 500);
+    s.tp      = clamp(jitter(s.tp  + (Math.random()-0.49)*20, 0.02), 50, 3000);
+    s.pl      = clamp(jitter(s.pl  + (Math.random()-0.49)*0.1, 0.05), 0, 25);
+
+    // Status
+    const fault = s.cpu>80 || s.lat>150 || s.pl>10;
+    const warn  = s.cpu>65 || s.lat>100 || s.pl>5;
+    s.status = fault?'critical': warn?'warning':'normal';
+
+    // Heatmap history (one per second)
+    const nh = heatmapHistory[n];
+    nh.cpu.push(Math.round(s.cpu)); if(nh.cpu.length>12) nh.cpu.shift();
+    nh.latency.push(Math.round(s.lat)); if(nh.latency.length>12) nh.latency.shift();
+    nh.packet_loss.push(+(s.pl).toFixed(1)); if(nh.packet_loss.length>12) nh.packet_loss.shift();
+    nh.throughput.push(Math.round(s.tp)); if(nh.throughput.length>12) nh.throughput.shift();
+
+    totalCpu += s.cpu; totalLat += s.lat; totalTp += s.tp; totalPl += s.pl;
+  });
+
+  const n = NODES.length;
+  const avg = {cpu:totalCpu/n, lat:totalLat/n, tp:totalTp/n, pl:totalPl/n, ts:new Date().toLocaleTimeString()};
+
+  history.cpu.push(Math.round(avg.cpu));
+  history.latency.push(Math.round(avg.lat));
+  history.throughput.push(Math.round(avg.tp));
+  history.packet_loss.push(+avg.pl.toFixed(2));
+  history.ts.push(avg.ts);
+  ['cpu','latency','throughput','packet_loss','ts'].forEach(k=>{if(history[k].length>HISTORY_LEN)history[k].shift();});
+
+  systemStats.syncLatency = +(Math.random()*10+8).toFixed(1);
+  systemStats.stateAccuracy = +(99.2 + Math.random()*0.7).toFixed(1);
+
+  return avg;
+}
+
+// ============================================================
+// ATTACK SCENARIOS
+// ============================================================
+const ATTACKS = {
+  ddos: {
+    name:'DDoS Traffic Flood', icon:'🌊',
+    phases:[
+      {delay:0,    msg:'DDoS simulation initiated — injecting 10× traffic load',   apply:(s)=>{s['EDGE-1'].pl=Math.min(s['EDGE-1'].pl+8,22); s['EDGE-2'].pl=Math.min(s['EDGE-2'].pl+6,18);}},
+      {delay:2000, msg:'[TWIN DETECTED] Packet loss anomaly on EDGE-1, EDGE-2 — confidence 91%', ai:true},
+      {delay:4000, msg:'[AUTO ACTION] Traffic throttle applied — rerouting 60% load via CORE',   heal:true, apply:(s)=>{s['EDGE-1'].pl=Math.max(s['EDGE-1'].pl-5,2); s['EDGE-2'].pl=Math.max(s['EDGE-2'].pl-4,2);}},
+      {delay:7000, msg:'[HEALED] Packet loss restored to normal. SLA breach prevented.', done:true},
+    ]
+  },
+  cpu: {
+    name:'CPU Overload Injection', icon:'🔥',
+    phases:[
+      {delay:0,    msg:'CPU overload injected on CLOUD node — driving to 95%+', apply:(s)=>{s['CLOUD'].cpu=95; s['CLOUD'].trend=2;}},
+      {delay:2000, msg:'[TWIN DETECTED] CLOUD CPU critical — trend shows continued rise — confidence 94%', ai:true},
+      {delay:3500, msg:'[AUTO ACTION] Load redistribution: 40% CLOUD workload → EDGE-1, EDGE-2', heal:true, apply:(s)=>{s['CLOUD'].cpu=62; s['CLOUD'].trend=-1; s['EDGE-1'].cpu=Math.min(s['EDGE-1'].cpu+12,72);}},
+      {delay:7000, msg:'[HEALED] CLOUD CPU normalised at 58%. Zero downtime achieved.', done:true},
+    ]
+  },
+  latency: {
+    name:'Latency Spike', icon:'⏱',
+    phases:[
+      {delay:0,    msg:'Latency spike injected — simulating congested backhaul link', apply:(s)=>{s['CORE'].lat=420; s['CLOUD'].lat=380;}},
+      {delay:2000, msg:'[TWIN DETECTED] Latency threshold breach — CORE: 420ms, CLOUD: 380ms — confidence 88%', ai:true},
+      {delay:3500, msg:'[AUTO ACTION] Path re-routing initiated — bypass route via RAN-1 activated', heal:true, apply:(s)=>{s['CORE'].lat=35; s['CLOUD'].lat=52;}},
+      {delay:7000, msg:'[HEALED] Latency normalised. Re-route reduced latency by 88%.', done:true},
+    ]
+  },
+  cascade: {
+    name:'Cascade Failure', icon:'💀',
+    phases:[
+      {delay:0,    msg:'CASCADE initiated — EDGE-1 primary failure simulated', apply:(s)=>{s['EDGE-1'].cpu=99; s['EDGE-1'].pl=18;}},
+      {delay:1500, msg:'EDGE-1 overload propagating → CORE receiving excess load',  apply:(s)=>{s['CORE'].cpu=Math.min(s['CORE'].cpu+25,88);}},
+      {delay:2500, msg:'[TWIN DETECTED] Cascade pattern identified — multi-node correlation — confidence 97%', ai:true},
+      {delay:3500, msg:'[AUTO ACTION] AI isolates EDGE-1 → routes traffic to EDGE-2 + RAN-1 fallback', heal:true, apply:(s)=>{s['EDGE-1'].cpu=45; s['EDGE-1'].pl=1.5; s['CORE'].cpu=Math.max(s['CORE'].cpu-20,45);}},
+      {delay:8000, msg:'[HEALED] Cascade contained. All nodes stable. MTTR: 8.5 seconds.', done:true},
+    ]
+  },
+  partition: {
+    name:'Network Partition', icon:'✂',
+    phases:[
+      {delay:0,    msg:'CLOUD node partitioned — link to CORE severed', apply:(s)=>{s['CLOUD'].lat=490; s['CLOUD'].tp=Math.max(s['CLOUD'].tp*0.1,80);}},
+      {delay:2000, msg:'[TWIN DETECTED] CLOUD unreachable — SLA breach predicted in 4 min — confidence 92%', ai:true},
+      {delay:3500, msg:'[AUTO ACTION] Activating CLOUD fallback path via EDGE-2 relay node', heal:true, apply:(s)=>{s['CLOUD'].lat=65; s['CLOUD'].tp=Math.min(s['CLOUD'].tp*3,600);}},
+      {delay:7000, msg:'[HEALED] CLOUD re-partitioned. Fallback path stable. SLA maintained.', done:true},
+    ]
+  },
+  memoryleak: {
+    name:'Memory Leak Simulation', icon:'🧩',
+    phases:[
+      {delay:0,    msg:'Memory leak simulation: gradual CPU drift on RAN-1 initiated', apply:(s)=>{s['RAN-1'].trend=3;}},
+      {delay:2000, msg:'RAN-1 CPU drifting: 35% → 52% → 68%... trend analysis active', apply:(s)=>{s['RAN-1'].cpu=68;}},
+      {delay:4000, msg:'[TWIN DETECTED] Pre-fault drift pattern on RAN-1 — 78% confidence — PREVENTIVE action triggered', ai:true},
+      {delay:5000, msg:'[AUTO ACTION] Preventive process restart on RAN-1 — before threshold breach', heal:true, apply:(s)=>{s['RAN-1'].cpu=28; s['RAN-1'].trend=0;}},
+      {delay:8000, msg:'[HEALED] Fault prevented before occurrence. This is proactive self-healing.', done:true},
+    ]
+  }
+};
+
+let attackLog = [];
+
+function launchAttack(type) {
+  if(attackActive) return;
+  const atk = ATTACKS[type];
+  if(!atk) return;
+  attackActive = true;
+  currentAttack = type;
+  attackPhase = 0;
+  attackLog = [];
+  document.getElementById('attack-status-badge').textContent = '● ACTIVE';
+  document.getElementById('attack-status-badge').className = 'badge red';
+  document.getElementById('heal-btn').disabled = true;
+  document.querySelectorAll('.attack-btn').forEach(b=>b.disabled=true);
+  document.getElementById('atk-ai-sub').textContent = 'Analyzing threat — '+atk.name;
+
+  const btn = document.getElementById('atk-'+type.replace(/[^a-z]/g,''));
+  if(btn) btn.classList.add('active');
+
+  const logEl = document.getElementById('attack-log');
+  logEl.innerHTML = '';
+
+  atk.phases.forEach(phase=>{
+    setTimeout(()=>{
+      if(phase.apply) phase.apply(nodeState);
+      const t = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const cls = phase.done?'heal': phase.heal?'heal': phase.ai?'info':'attack';
+      attackLog.push({time:t, msg:phase.msg, cls});
+      renderAttackLog();
+
+      if(phase.ai) updateAtkAI(phase.msg, atk.name);
+
+      if(phase.done) {
+        setTimeout(()=>{
+          document.getElementById('attack-status-badge').textContent = '✓ HEALED';
+          document.getElementById('attack-status-badge').className = 'badge green';
+          document.getElementById('heal-btn').disabled = false;
+          systemStats.actionsToday += 2;
+          systemStats.faultsPrevented += 1;
+          logAction(atk.name+' contained autonomously', 'EDGE-1', 'AUTO-HEAL');
+        }, 500);
+      }
+    }, phase.delay);
+  });
+
+  // Performance metrics
+  setTimeout(()=>renderAttackPerformance(atk), 5000);
+}
+
+function triggerHeal() {
+  NODES.forEach(n=>{
+    nodeState[n].cpu = clamp(nodeState[n].cpu * 0.5 + 20, 15, 65);
+    nodeState[n].lat = clamp(nodeState[n].lat * 0.3 + 15, 10, 60);
+    nodeState[n].pl  = clamp(nodeState[n].pl  * 0.2 + 0.3, 0.1, 3);
+    nodeState[n].trend = 0;
+    nodeState[n].status = 'normal';
+  });
+  attackActive = false;
+  currentAttack = null;
+  document.getElementById('attack-status-badge').textContent = 'STANDBY';
+  document.getElementById('attack-status-badge').className = 'badge cyan';
+  document.getElementById('heal-btn').disabled = true;
+  document.querySelectorAll('.attack-btn').forEach(b=>b.disabled=false);
+  document.querySelectorAll('.attack-btn.active').forEach(b=>b.classList.remove('active'));
+  attackLog.push({time: new Date().toLocaleTimeString('en',{hour12:false}), msg:'[FULL RESET] All systems restored to baseline. Digital twin re-synced.', cls:'heal'});
+  renderAttackLog();
+}
+
+function renderAttackLog() {
+  const el = document.getElementById('attack-log');
+  el.innerHTML = attackLog.slice().reverse().map(e=>`
+    <div class="atk-entry">
+      <div class="atk-time">${e.time}</div>
+      <div class="atk-msg ${e.cls}">${e.msg}</div>
+    </div>`).join('');
+}
+
+function renderAttackPerformance(atk) {
+  const el = document.getElementById('atk-performance');
+  const detectionTime = (1.8 + Math.random()*1.2).toFixed(1);
+  const responseTime  = (0.8 + Math.random()*0.5).toFixed(1);
+  const healTime      = (3.5 + Math.random()*2).toFixed(1);
+  el.innerHTML = `
+    <div class="sla-row"><span class="sla-label">Detection time</span><span class="sla-val" style="color:var(--cyan)">${detectionTime}s</span></div>
+    <div class="sla-row"><span class="sla-label">Decision latency</span><span class="sla-val" style="color:var(--cyan)">${responseTime}s</span></div>
+    <div class="sla-row"><span class="sla-label">Full MTTR</span><span class="sla-val" style="color:var(--green)">${healTime}s</span></div>
+    <div class="sla-row"><span class="sla-label">SLA breach</span><span class="sla-val" style="color:var(--green)">PREVENTED</span></div>
+    <div class="sla-row"><span class="sla-label">Human needed</span><span class="sla-val" style="color:var(--green)">NONE</span></div>
+  `;
+}
+
+function updateAtkAI(msg, scenario) {
+  const el = document.getElementById('atk-ai-text');
+  document.getElementById('atk-ai-sub').textContent = scenario+' detected';
+  el.innerHTML = '';
+  const texts = {
+    'ddos': `<span class="danger">DDoS pattern confirmed.</span> Packet loss on EDGE-1 correlates with <span class="highlight">volume anomaly 10× baseline</span>. Digital twin predicted SLA breach in &lt;90 seconds. Autonomous throttle reduced inbound rate by 60%. System stable.`,
+    'cpu':  `<span class="danger">CPU overload signature detected.</span> CLOUD node trending at <span class="highlight">+2.4%/second</span> — thermal throttling imminent. Twin triggered proactive load shift. Zero service interruption achieved through predictive action.`,
+    'latency': `<span class="danger">Latency spike pattern.</span> CORE and CLOUD links exceeded <span class="highlight">4× normal baseline</span>. Backhaul congestion confirmed. Autonomous re-route activated via RAN-1 — latency reduced from 420ms to 35ms in <span class="ok">3.5 seconds</span>.`,
+    'cascade': `<span class="danger">CASCADE ALERT — Multi-node correlation detected.</span> EDGE-1 failure propagating to CORE. <span class="highlight">97% confidence</span> of full outage in &lt;2 min. AI issued isolation order + automatic failover. Cascade contained before customer impact.`,
+    'partition': `<span class="danger">Network partition detected.</span> CLOUD node unreachable via primary path. SLA breach predicted in <span class="highlight">4 minutes</span>. Fallback relay via EDGE-2 activated autonomously. Service continuity maintained.`,
+    'memoryleak': `<span class="highlight">Predictive fault prevention triggered.</span> RAN-1 CPU drift pattern matches pre-fault signature. Trend extrapolation showed <span class="danger">threshold breach in ~90 seconds</span>. Preventive restart issued BEFORE failure occurred. This demonstrates proactive self-healing.`
+  };
+  const match = Object.keys(texts).find(k=>msg.toLowerCase().includes(k));
+  const t = texts[currentAttack] || msg;
+  typeText(el, t);
+}
+
+// ============================================================
+// AI TEXT TYPEWRITER
+// ============================================================
+function typeText(el, html, speed=18) {
+  const stripped = html.replace(/<[^>]*>/g,'');
+  let i=0;
+  el.innerHTML='<span class="ai-cursor"></span>';
+  const interval=setInterval(()=>{
+    if(i>=stripped.length){
+      el.innerHTML=html+'<span class="ai-cursor"></span>';
+      clearInterval(interval);return;
+    }
+    el.innerHTML=stripped.substring(0,i+1)+'<span class="ai-cursor"></span>';
+    i++;
+  },speed);
+}
+
+// ============================================================
+// AI EXPLANATION ENGINE
+// ============================================================
+function generateAIExplanation(nodeData) {
+  const critical = NODES.filter(n=>nodeState[n].status==='critical');
+  const warning  = NODES.filter(n=>nodeState[n].status==='warning');
+  const el = document.getElementById('ai-explanation');
+  const sub = document.getElementById('ai-sub');
+  const badge = document.getElementById('ai-confidence-badge');
+
+  let text, conf, badgeCls;
+
+  if(critical.length>0){
+    const n = critical[0];
+    const s = nodeState[n];
+    text = `<span class="danger">FAULT DETECTED on ${n}.</span> CPU: <span class="danger">${Math.round(s.cpu)}%</span>, Latency: <span class="danger">${Math.round(s.lat)}ms</span>, Packet Loss: <span class="danger">${s.pl.toFixed(1)}%</span>. `+
+           `Root cause analysis indicates <span class="highlight">resource exhaustion</span>. Autonomous action controller has initiated corrective response. `+
+           `Estimated recovery: <span class="ok">&lt;10 seconds</span>.`;
+    conf = 88 + Math.random()*9;
+    badgeCls='red'; badge.className='badge red'; badge.textContent='FAULT '+Math.round(conf)+'%';
+    sub.textContent = critical.length+' critical node'+(critical.length>1?'s':'')+' detected';
+  } else if(warning.length>0){
+    const n = warning[0];
+    const s = nodeState[n];
+    text = `<span style="color:var(--amber)">WARNING: ${n} trending toward fault threshold.</span> Current CPU: <span class="highlight">${Math.round(s.cpu)}%</span> (threshold: 80%). Trend analysis shows <span class="highlight">+${(0.5+Math.random()*1.5).toFixed(1)}%/min</span> drift rate. `+
+           `Digital twin predicts threshold breach in <span style="color:var(--amber)">${Math.round(90+Math.random()*120)} seconds</span>. Preventive action recommended.`;
+    conf = 65 + Math.random()*20;
+    badgeCls='amber'; badge.className='badge amber'; badge.textContent='WARN '+Math.round(conf)+'%';
+    sub.textContent = warning.length+' node'+(warning.length>1?'s':'')+' showing early degradation';
+  } else {
+    text = `<span class="ok">All systems nominal.</span> Digital twin sync confirmed across all 5 nodes. Mean CPU: <span class="highlight">${Math.round(nodeData.cpu)}%</span>, Latency: <span class="highlight">${Math.round(nodeData.lat)}ms</span>. No anomalies detected in rolling 60-sample window. `+
+           `Prediction confidence: <span class="ok">no fault risk in next 5 minutes</span>.`;
+    conf = 15 + Math.random()*20;
+    badgeCls='green'; badge.className='badge green'; badge.textContent='NOMINAL';
+    sub.textContent = 'All 5 nodes healthy — zero anomalies detected';
+  }
+
+  typeText(el, text);
+  renderConfidenceBars(critical, warning, conf);
+}
+
+function renderConfidenceBars(critical, warning, mainConf){
+  const el=document.getElementById('confidence-bars');
+  const bars=[
+    {label:'Fault probability', val:Math.round(critical.length>0?mainConf:warning.length>0?mainConf*0.5:mainConf), color:critical.length>0?'var(--red)':warning.length>0?'var(--amber)':'var(--green)'},
+    {label:'Twin sync fidelity', val:Math.round(97+Math.random()*2.5), color:'var(--cyan)'},
+    {label:'Prediction horizon', val:Math.round(70+Math.random()*25), color:'var(--purple)'},
+  ];
+  el.innerHTML=bars.map(b=>`
+    <div class="confidence-bar-wrap">
+      <div class="conf-label">${b.label}</div>
+      <div class="conf-bar-outer"><div class="conf-bar-inner" style="width:${b.val}%;background:${b.color}"></div></div>
+      <div class="conf-val" style="color:${b.color}">${b.val}%</div>
+    </div>`).join('');
+}
+
+// ============================================================
+// HEATMAP
+// ============================================================
+function heatmapColor(val, metric){
+  const thresholds = {
+    cpu:        [0,30,50,65,75,85,100],
+    latency:    [0,20,50,80,120,160,500],
+    packet_loss:[0,1, 2, 4, 6, 10, 25],
+    throughput: [3000,1500,1000,600,300,150,0],
+  };
+  const t = thresholds[metric]||thresholds.cpu;
+  const isInvert = metric==='throughput';
+  const colors = isInvert
+    ? ['#ff2244','#ff6600','#ffaa00','#aacc22','#44cc88','#00ff88']
+    : ['#00ff88','#44cc88','#aacc22','#ffaa00','#ff6600','#ff2244'];
+  const ranges = isInvert?[...t].reverse():t;
+  for(let i=0;i<colors.length;i++){
+    if(isInvert? val>=ranges[i]:val<=ranges[i+1]) {
+      return {color:colors[i], alpha:0.75};
+    }
+  }
+  return {color:colors[colors.length-1], alpha:0.85};
+}
+
+function renderHeatmap(){
+  const metric = document.getElementById('hm-metric-select').value;
+  const container = document.getElementById('heatmap-container');
+  const labels = Array.from({length:12},(_,i)=>`T-${11-i}`);
+  labels[11]='NOW';
+
+  let html = `<div class="heatmap-grid">`;
+  html += `<div></div>`;
+  labels.forEach(l=>`<div class="hm-header">${l}</div>`).forEach(h=>html+=h);
+
+  NODES.forEach(node=>{
+    const vals = heatmapHistory[node][metric];
+    html+=`<div class="hm-label">${node}</div>`;
+    const padded = [...Array(Math.max(0,12-vals.length)).fill(null), ...vals];
+    padded.forEach((v,i)=>{
+      if(v===null){html+=`<div class="hm-cell" style="background:rgba(255,255,255,0.02);"></div>`;return;}
+      const {color} = heatmapColor(v,metric);
+      const unit = metric==='cpu'||metric==='packet_loss'?'%':metric==='latency'?'ms':'M';
+      html+=`<div class="hm-cell" style="background:${color}cc" onclick="explainHeatmapCell('${node}',${v},'${metric}','${labels[i]}')" title="${node} ${metric}: ${v}${unit}">${v}</div>`;
+    });
+  });
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+function explainHeatmapCell(node, val, metric, t){
+  const el = document.getElementById('heatmap-ai-text');
+  const thresholds = {cpu:{w:65,c:80,u:'%'},latency:{w:100,c:150,u:'ms'},packet_loss:{w:5,c:10,u:'%'},throughput:{w:200,c:100,u:'Mbps'}};
+  const th = thresholds[metric]||{w:65,c:80,u:''};
+  const severity = val>th.c?'critical':val>th.w?'warning':'normal';
+  const metricName = {cpu:'CPU utilisation',latency:'network latency',packet_loss:'packet loss',throughput:'throughput'}[metric];
+
+  const texts = {
+    critical:`<span class="danger">ANOMALY: ${node} — ${metricName} = ${val}${th.u} at ${t}.</span> This exceeds the critical threshold of ${th.c}${th.u}. Root cause: likely resource contention or external load spike. The digital twin flagged this in real-time. Autonomous action controller was triggered — corrective response issued within 1.8 seconds. Impact: ${severity} SLA risk.`,
+    warning: `<span style="color:var(--amber)">WARNING: ${node} — ${metricName} = ${val}${th.u} at ${t}.</span> Approaching critical threshold (${th.c}${th.u}). Trend analysis is monitoring. Digital twin has pre-positioned resources for fast response if degradation continues. Current risk level: <span class="highlight">moderate</span>.`,
+    normal:  `<span class="ok">NOMINAL: ${node} — ${metricName} = ${val}${th.u} at ${t}.</span> Within expected operational range. Digital twin confirms healthy state. No corrective action required.`
+  };
+  typeText(el, texts[severity]);
+}
+
+// ============================================================
+// NETWORK TOPOLOGY
+// ============================================================
+const TOPO_NODES = [
+  {id:'internet', x:350, y:30,  label:'INTERNET',  type:'cloud'},
+  {id:'RAN-1',    x:100, y:110, label:'RAN-1',     type:'ran'},
+  {id:'EDGE-1',   x:220, y:190, label:'EDGE-1',    type:'edge'},
+  {id:'EDGE-2',   x:480, y:190, label:'EDGE-2',    type:'edge'},
+  {id:'CORE',     x:350, y:190, label:'CORE',      type:'core'},
+  {id:'CLOUD',    x:590, y:110, label:'CLOUD',     type:'cloud2'},
+];
+const TOPO_LINKS = [
+  ['internet','RAN-1'],['internet','CORE'],['internet','CLOUD'],
+  ['RAN-1','EDGE-1'],['RAN-1','CORE'],
+  ['CORE','EDGE-1'],['CORE','EDGE-2'],['CORE','CLOUD'],
+  ['EDGE-2','CLOUD'],
+];
+
+function renderTopology(){
+  const linksG  = document.getElementById('topo-links');
+  const nodesG  = document.getElementById('topo-nodes');
+
+  // Links
+  linksG.innerHTML = TOPO_LINKS.map(([a,b])=>{
+    const na=TOPO_NODES.find(n=>n.id===a), nb=TOPO_NODES.find(n=>n.id===b);
+    if(!na||!nb) return '';
+    const sa=nodeState[a]||{status:'normal'}, sb=nodeState[b]||{status:'normal'};
+    const crit=(sa.status==='critical'||sb.status==='critical');
+    const warn=(sa.status==='warning'||sb.status==='warning');
+    const stroke=crit?'rgba(255,34,68,0.6)':warn?'rgba(255,170,0,0.4)':'rgba(0,229,255,0.15)';
+    const w=crit?2:1;
+    const dash=crit?'4 3':'6 4';
+    return `<line x1="${na.x}" y1="${na.y}" x2="${nb.x}" y2="${nb.y}" stroke="${stroke}" stroke-width="${w}" stroke-dasharray="${dash}" class="topo-link"/>`;
+  }).join('');
+
+  // Nodes
+  nodesG.innerHTML = TOPO_NODES.map(n=>{
+    const s = nodeState[n.id]||{status:'normal',cpu:0};
+    const color = s.status==='critical'?'#ff2244':s.status==='warning'?'#ffaa00':'#00e5ff';
+    const glowColor = s.status==='critical'?'rgba(255,34,68,0.3)':s.status==='warning'?'rgba(255,170,0,0.2)':'rgba(0,229,255,0.15)';
+    const cpu = s.cpu?Math.round(s.cpu):'—';
+    return `<g class="topo-node" onclick="explainTopoNode('${n.id}')">
+      <circle cx="${n.x}" cy="${n.y}" r="22" fill="rgba(6,12,24,0.95)" stroke="${color}" stroke-width="1.5"/>
+      <circle cx="${n.x}" cy="${n.y}" r="30" fill="${glowColor}" class="node-ring"/>
+      <text x="${n.x}" y="${n.y-4}" text-anchor="middle" fill="${color}" font-size="8" font-family="Rajdhani,sans-serif" font-weight="700" letter-spacing="0.05em">${n.label}</text>
+      <text x="${n.x}" y="${n.y+8}" text-anchor="middle" fill="${color}" font-size="9" font-family="JetBrains Mono,monospace" font-weight="700">${cpu}%</text>
+    </g>`;
+  }).join('');
+}
+
+function explainTopoNode(id){
+  const s = nodeState[id];
+  const el = document.getElementById('topo-ai-text');
+  if(!s){typeText(el,`<span class="highlight">${id}</span> is an external reference node. No telemetry available.`);return;}
+  const text=`<span class="highlight">Node: ${id}</span> — Status: <span class="${s.status==='critical'?'danger':s.status==='warning'?'highlight':'ok'}">${s.status.toUpperCase()}</span><br>`+
+    `CPU: ${Math.round(s.cpu)}% | Latency: ${Math.round(s.lat)}ms | Throughput: ${Math.round(s.tp)}Mbps | Packet Loss: ${s.pl.toFixed(1)}%<br>`+
+    `Digital twin sync: <span class="ok">confirmed</span> — last update: ${new Date().toLocaleTimeString()}`;
+  typeText(el, text);
+}
+
+// ============================================================
+// RENDER LOOP
+// ============================================================
+let charts = {};
+let frameCount = 0;
+
+function initCharts(){
+  if(charts.cpu) return;
+  const base={type:'line',data:{labels:[],datasets:[{data:[],borderWidth:1.5,pointRadius:0,tension:0.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'rgba(61,90,110,0.8)',font:{size:9,family:'JetBrains Mono'}},border:{display:false}}}}};
+  const cfgs=[
+    {id:'chart-cpu', color:'#ffaa00', label:'CPU%'},
+    {id:'chart-lat', color:'#00e5ff', label:'Latency'},
+    {id:'chart-tp',  color:'#00ff88', label:'Throughput'},
+    {id:'chart-pl',  color:'#ff2244', label:'Packet Loss'},
+  ];
+  cfgs.forEach(c=>{
+    const canvas=document.getElementById(c.id);
+    if(!canvas) return;
+    const cfg=JSON.parse(JSON.stringify(base));
+    cfg.data.datasets[0].borderColor=c.color;
+    cfg.data.datasets[0].backgroundColor=c.color+'18';
+    const key=c.id.replace('chart-','');
+    charts[key]=new Chart(canvas,cfg);
+  });
+}
+
+function updateCharts(){
+  if(!document.getElementById('page-analytics').classList.contains('active')) return;
+  initCharts();
+  const map={cpu:history.cpu,lat:history.latency,tp:history.throughput,pl:history.packet_loss};
+  Object.entries(map).forEach(([k,data])=>{
+    if(!charts[k]) return;
+    charts[k].data.labels=history.ts.slice(-data.length);
+    charts[k].data.datasets[0].data=data;
+    charts[k].update('none');
+  });
+}
+
+function logAction(action, node, type){
+  const t=new Date().toLocaleTimeString('en',{hour12:false});
+  actionsLog.unshift({time:t,node,action,type});
+  if(actionsLog.length>30) actionsLog.pop();
+}
+
+function renderAll(avg){
+  renderKPIs(avg);
+  renderSidebar();
+  renderNodeBars();
+  renderTwinHealth();
+  renderActionsLog();
+  renderSLA();
+  renderTopology();
+  updateCharts();
+  if(document.getElementById('page-heatmap').classList.contains('active')) renderHeatmap();
+
+  // Update topbar
+  const allCrit=NODES.filter(n=>nodeState[n].status==='critical');
+  const allWarn=NODES.filter(n=>nodeState[n].status==='warning');
+  const gs=document.getElementById('global-status');
+  const gt=document.getElementById('global-status-text');
+  if(allCrit.length){ gs.className='global-status critical';gt.textContent='FAULT DETECTED'; }
+  else if(allWarn.length){ gs.className='global-status warning';gt.textContent='WARNING'; }
+  else { gs.className='global-status nominal';gt.textContent='NOMINAL'; }
+
+  document.getElementById('tb-cpu').textContent=Math.round(avg.cpu)+'%';
+  document.getElementById('tb-lat').textContent=Math.round(avg.lat)+'ms';
+  document.getElementById('tb-tp').textContent=Math.round(avg.tp)+'M';
+  document.getElementById('tb-pl').textContent=avg.pl.toFixed(1)+'%';
+  document.getElementById('tb-faults').textContent=systemStats.faultsPrevented;
+  document.getElementById('sb-sync').textContent=systemStats.syncLatency+'ms';
+  document.getElementById('sb-acc').textContent=systemStats.stateAccuracy+'%';
+
+  // AI explanation — update every ~5 ticks
+  if(frameCount%5===0 && document.getElementById('page-overview').classList.contains('active')){
+    generateAIExplanation(avg);
+  }
+
+  frameCount++;
+}
+
+function renderKPIs(avg){
+  const defs=[
+    {id:'kpi-cpu',  val:avg.cpu,  unit:'%',    label:'CPU Avg',    warn:65,crit:80},
+    {id:'kpi-lat',  val:avg.lat,  unit:'ms',   label:'Latency',    warn:100,crit:150},
+    {id:'kpi-tp',   val:avg.tp,   unit:'Mbps', label:'Throughput', warn:300,crit:150,inv:true},
+    {id:'kpi-pl',   val:avg.pl,   unit:'%',    label:'Pkt Loss',   warn:5,crit:10},
+    {id:'kpi-sync', val:systemStats.syncLatency,unit:'ms',label:'Twin Sync', warn:20,crit:40},
+  ];
+  const el=document.getElementById('kpi-row');
+  el.innerHTML=defs.map(d=>{
+    const cls=d.inv?(d.val<d.crit?'red':d.val<d.warn?'amber':'green'):(d.val>=d.crit?'red':d.val>=d.warn?'amber':'green');
+    const sparkKey=d.id==='kpi-cpu'?'cpu':d.id==='kpi-lat'?'latency':d.id==='kpi-tp'?'throughput':d.id==='kpi-pl'?'packet_loss':null;
+    const sparkData=sparkKey?history[sparkKey].slice(-12):[];
+    const mx=Math.max(...sparkData,1);
+    const sparks=sparkData.map(v=>{
+      const h=Math.max(2,Math.round((v/mx)*18));
+      const sc=d.inv?(v<d.crit?'var(--red)':v<d.warn?'var(--amber)':'var(--green)'):(v>=d.crit?'var(--red)':v>=d.warn?'var(--amber)':'var(--green)');
+      return `<div class="b" style="height:${h}px;background:${sc}"></div>`;
+    }).join('');
+    const v=d.id==='kpi-tp'?(Math.round(d.val)):(d.id==='kpi-pl'?d.val.toFixed(1):Math.round(d.val));
+    return `<div class="kpi ${cls}">
+      <div class="kpi-label">${d.label}</div>
+      <div class="kpi-val">${v}<span class="kpi-unit">${d.unit}</span></div>
+      <div class="kpi-spark">${sparks}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSidebar(){
+  const el=document.getElementById('sb-nodes');
+  el.innerHTML=NODES.map(n=>{
+    const s=nodeState[n];
+    const cls=s.status==='critical'?'red':s.status==='warning'?'amber':'green';
+    return `<div class="sb-node">
+      <div class="dot ${cls}"></div>
+      <div class="sb-node-name">${n}</div>
+      <div class="sb-node-val">${Math.round(s.cpu)}%</div>
+    </div>`;
+  }).join('');
+  // Uptime
+  const up=Math.floor((Date.now()-systemStats.uptimeStart)/1000);
+  const h=Math.floor(up/3600),m=Math.floor((up%3600)/60),s=up%60;
+  document.getElementById('sb-uptime').textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function renderNodeBars(){
+  const el=document.getElementById('node-cpu-bars');
+  el.innerHTML=NODES.map(n=>{
+    const s=nodeState[n];
+    const cpu=Math.round(s.cpu);
+    const cls=cpu>=80?'crit':cpu>=65?'warn':'ok';
+    const barColor=cpu>=80?'var(--red)':cpu>=65?'var(--amber)':'var(--green)';
+    return `<div class="node-bar-row">
+      <div class="nbr-name">${n}</div>
+      <div class="nbr-track"><div class="nbr-fill" style="width:${cpu}%;background:${barColor}"></div></div>
+      <div class="nbr-val">${cpu}%</div>
+      <div class="nbr-badge ${cls}">${cls.toUpperCase()}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTwinHealth(){
+  const el=document.getElementById('twin-health-grid');
+  el.innerHTML=[
+    {val:systemStats.syncLatency+'ms', label:'Sync Latency', color:'var(--cyan)'},
+    {val:systemStats.stateAccuracy+'%',label:'State Accuracy',color:'var(--green)'},
+    {val:systemStats.actionsToday,     label:'Actions Today', color:'var(--cyan)'},
+    {val:systemStats.faultsPrevented,  label:'Faults Prevented',color:'var(--purple)'},
+  ].map(s=>`<div class="twin-stat">
+    <div class="ts-val" style="color:${s.color}">${s.val}</div>
+    <div class="ts-label">${s.label}</div>
+  </div>`).join('');
+}
+
+function renderActionsLog(){
+  const el=document.getElementById('actions-log');
+  if(!actionsLog.length){el.innerHTML='<div class="no-data">No autonomous actions yet</div>';return;}
+  el.innerHTML=actionsLog.slice(0,8).map(a=>`
+    <div class="log-entry">
+      <div class="log-time">${a.time}</div>
+      <div class="log-node">[${a.node}]</div>
+      <div class="log-action">${a.action}</div>
+    </div>`).join('');
+  document.getElementById('action-count-badge').textContent=systemStats.actionsToday+' TODAY';
+}
+
+function renderSLA(){
+  const el=document.getElementById('sla-panel');
+  const cpuData=history.cpu, latData=history.latency, plData=history.packet_loss, tpData=history.throughput;
+  const avail=100-((cpuData.filter(v=>v>95).length/Math.max(cpuData.length,1))*100);
+  const latSLA=(latData.filter(v=>v<100).length/Math.max(latData.length,1))*100;
+  const plSLA=(plData.filter(v=>v<5).length/Math.max(plData.length,1))*100;
+  const tpSLA=(tpData.filter(v=>v>100).length/Math.max(tpData.length,1))*100;
+  const rows=[
+    {label:'Availability',        val:avail, tgt:99.5},
+    {label:'Latency < 100ms',     val:latSLA,tgt:95},
+    {label:'Packet loss < 5%',    val:plSLA, tgt:90},
+    {label:'Throughput > 100M',   val:tpSLA, tgt:90},
+  ];
+  el.innerHTML=rows.map(r=>{
+    const v=Math.min(r.val,100).toFixed(1);
+    const color=r.val>=r.tgt?'var(--green)':r.val>=r.tgt-10?'var(--amber)':'var(--red)';
+    return `<div class="sla-row">
+      <span class="sla-label">${r.label}</span>
+      <div class="sla-right">
+        <div class="sla-track"><div class="sla-fill" style="width:${Math.min(r.val,100)}%;background:${color}"></div></div>
+        <span class="sla-val" style="color:${color}">${v}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+function showPage(id, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  if(id==='analytics') setTimeout(initCharts,50);
+  if(id==='heatmap') renderHeatmap();
+  if(id==='topology') renderTopology();
+}
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock(){
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('en',{hour12:false});
+}
+
+// ============================================================
+// HARDWARE DATA MODE — fetch from Flask APIs
+// Simulation mode used only if window.HW_MODE is not set
+//   (i.e. when opening the file directly without the server)
+// ============================================================
+const IS_HW = (typeof window.HW_MODE !== 'undefined' && window.HW_MODE === true);
+
+// ── LIVE API FETCH ────────────────────────────────────────
+async function fetchHardwareData() {
+  try {
+    const [nodesRes, histRes, actionsRes, statsRes] = await Promise.all([
+      fetch('/api/nodes'),
+      fetch('/api/history'),
+      fetch('/api/actions?limit=20'),
+      fetch('/api/stats'),
+    ]);
+
+    const nodesData   = await nodesRes.json();
+    const histData    = await histRes.json();
+    const actionsData = await actionsRes.json();
+    const statsData   = await statsRes.json();
+
+    // ── Sync nodeState from hardware ──────────────────────
+    Object.entries(nodesData).forEach(([name, n]) => {
+      if (!nodeState[name]) nodeState[name] = {cpu:0,lat:0,tp:0,pl:0,trend:0,status:'normal'};
+      nodeState[name].cpu    = n.cpu    !== null ? n.cpu    : nodeState[name].cpu;
+      nodeState[name].lat    = n.latency!== null ? n.latency: nodeState[name].lat;
+      nodeState[name].tp     = n.throughput!==null? n.throughput: nodeState[name].tp;
+      nodeState[name].pl     = n.packet_loss!==null? n.packet_loss: nodeState[name].pl;
+      nodeState[name].status = n.status || 'offline';
+      // Expose extra hardware fields for topology/detail views
+      nodeState[name].temperature = n.temperature;
+      nodeState[name].memory      = n.memory;
+      nodeState[name].disk        = n.disk;
+      nodeState[name].hostname    = n.hostname;
+      nodeState[name].fault       = n.fault;
+      nodeState[name].prediction  = n.prediction;
+      nodeState[name].confidence  = n.confidence;
+      nodeState[name].action      = n.action;
+      nodeState[name].fault_reason= n.fault_reason;
+      nodeState[name].prediction_reason = n.prediction_reason;
+    });
+
+    // ── Sync history from hardware ────────────────────────
+    if (histData.cpu)         history.cpu         = histData.cpu;
+    if (histData.latency)     history.latency      = histData.latency;
+    if (histData.throughput)  history.throughput   = histData.throughput;
+    if (histData.packet_loss) history.packet_loss  = histData.packet_loss;
+    if (histData.timestamps)  history.ts           = histData.timestamps;
+
+    // ── Sync actions log from hardware ───────────────────
+    if (actionsData && actionsData.length) actionsLog = actionsData;
+
+    // ── Sync stats from hardware ──────────────────────────
+    if (statsData) {
+      systemStats.actionsToday      = statsData.actions_taken_today || 0;
+      systemStats.faultsPrevented   = statsData.faults_prevented    || 0;
+      systemStats.syncLatency       = statsData.twin_sync_latency_ms|| 0;
+      systemStats.stateAccuracy     = statsData.state_accuracy_pct  || 99.6;
+      if (statsData.uptime) {
+        document.getElementById('sb-uptime').textContent = statsData.uptime;
+      }
+    }
+
+    // Compute aggregate avg for KPI / AI panel
+    const onlineNodes = Object.keys(nodeState).filter(n => nodeState[n].status !== 'offline');
+    if (onlineNodes.length === 0) return;
+
+    const avg = (key) => {
+      const vals = onlineNodes.map(n=>nodeState[n][key]).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
+      return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    };
+
+    const avgData = { cpu: avg('cpu'), lat: avg('lat'), tp: avg('tp'), pl: avg('pl') };
+
+    renderAll(avgData);
+    updateClock();
+
+    // Fetch heatmap separately (it's heavier)
+    if (document.getElementById('page-heatmap').classList.contains('active')) {
+      fetchHeatmapData();
+    }
+
+  } catch(e) {
+    console.warn('[DT-5G] API fetch failed, using simulation:', e.message);
+    // Graceful fallback to simulation if server is unreachable
+    const avg = tick();
+    renderAll(avg);
+    updateClock();
+  }
+}
+
+async function fetchHeatmapData() {
+  try {
+    const res  = await fetch('/api/heatmap');
+    const data = await res.json();
+    // Overwrite heatmapHistory with live server data
+    Object.entries(data).forEach(([node, metrics]) => {
+      if (!heatmapHistory[node]) heatmapHistory[node] = {cpu:[],latency:[],packet_loss:[],throughput:[]};
+      Object.entries(metrics).forEach(([metric, vals]) => {
+        heatmapHistory[node][metric] = vals;
+      });
+    });
+    renderHeatmap();
+  } catch(e) {
+    renderHeatmap(); // fallback to whatever local data we have
+  }
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────
+if (IS_HW) {
+  // Hardware mode: fetch real data from Flask server
+  fetchHardwareData();
+  setInterval(fetchHardwareData, 1500);
+  console.log('[DT-5G] Hardware mode — connected to Flask server');
+} else {
+  // Standalone demo mode: pure simulation (no server needed)
+  const initial = tick();
+  renderAll(initial);
+  updateClock();
+  setInterval(()=>{ const avg=tick(); renderAll(avg); updateClock(); }, 1500);
+  setInterval(()=>{
+    const crit=NODES.filter(n=>nodeState[n].status==='critical');
+    const warn=NODES.filter(n=>nodeState[n].status==='warning');
+    if(crit.length){ logAction(`Autonomous action on ${crit[0]}`,crit[0],'AUTO'); systemStats.actionsToday++; systemStats.faultsPrevented++; }
+    else if(warn.length && Math.random()>0.6){ logAction(`Preventive throttle on ${warn[0]}`,warn[0],'PREVENT'); systemStats.actionsToday++; }
+  }, 4000);
+  console.log('[DT-5G] Simulation mode — open via Flask server for real hardware data');
+}
+</script>
+</body>
+</html>
